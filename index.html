@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Programming Challenge</title>
+    <style>
+        * {
+            font-family: Arial, Helvetica, sans-serif;
+            letter-spacing: 0.1rem;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+
+        header {
+            background-color: #546c7f;
+            color: #ffffff;
+            padding: 20px 10%;
+        }
+
+        header h1 {
+            font-size: 16px;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .container {
+            padding: 20px 5%;
+        }
+
+        @media (min-width: 992px) {
+            .container {
+                padding: 20px 10%;
+            }
+        }
+
+        #products {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-gap: 40px 20px;
+        }
+
+        @media (min-width: 576px) {
+            #products {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 992px) {
+            #products {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .product {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #eee;
+            margin: 0;
+            padding-bottom: 1em;
+        }
+
+        .product--image img {
+            width: 100%;
+        }
+
+        .product--details {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .product--details h2, .product--details h3 {
+            text-decoration: none;
+        }
+
+        .product--details--title {
+            color: #8dd0bb;
+            margin: 0;
+            font-size: 20px;
+            padding-bottom: 6px;
+        }
+
+        .product--category {
+            margin: 0;
+            color: #546c7f;
+            text-decoration: underline;
+            font-size: 16px;
+            padding-bottom: 18px;
+        }
+
+        .product--link {
+            text-decoration: none;
+        }
+
+        .product--price {
+            margin: 0;
+            color: #546c7f;
+        }
+
+        .product--old-price {
+            opacity: 0.5;
+            padding-right: 2px;
+            text-decoration: line-through;
+            color: red;
+        }
+
+        .pagination {
+            text-align: center;
+            display: flex;
+            justify-content: stretch;
+            max-width: 300px;
+            margin: 2em auto;
+        }
+
+        .bottom-pager {
+            margin-top: 3em;
+        }
+
+        .pagination button {
+            color: black;
+            float: left;
+            padding: 8px 0;
+            text-decoration: none;
+            transition: background-color .3s;
+            border: 1px solid #ddd;
+            flex-grow: 1;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .pagination button.disabled {
+            cursor: not-allowed;
+            color: #bbbbbb;
+        }
+
+        .pagination button.active, .pagination button:hover:not(.disabled) {
+            background-color: #8dd0bb;
+            color: white;
+            border: 1px solid #8dd0bb;
+        }
+    </style>
+</head>
+    <body>
+        <header class="topnav">
+            <h1>Programming Challenge</h1>
+        </header>
+        <section class="container">
+            <div class="pagination"></div>
+            <div id="products"></div>
+            <div class="pagination bottom-pager"></div>
+        </section>
+    </body>
+<script>
+    let products = [];
+    let page = 0;
+    let itemsPerPage = 16;
+
+    /**
+     * Capitalize the first letter in each word in the string.
+     *
+     * @param {string} str
+     *
+     * @return {string} str with the first letter in each word capitalized.
+     */
+    function capitalizeWords(str = '') {
+        return str.split(' ')
+            .map((s) => s.charAt(0).toUpperCase() + s.substring(1))
+            .join(' ');
+    }
+
+    /**
+     * Take a number and return a USD formatted string.
+     *
+     * @param {number} amount
+     *
+     * @return {string} A USD formatted string for the amount.
+     */
+    function formatMoney(amount = 0) {
+        const options = {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+        };
+
+        // check if its a clean dollar amount
+        if (amount % 100 === 0) {
+            options.minimumFractionDigits = 0;
+        }
+
+        const formatter = Intl.NumberFormat('en-US', options);
+
+        return formatter.format(amount)
+    }
+
+    /**
+     * Get paged content and number of pages.
+     *
+     * @param {array} products
+     *
+     * @return {object} An object containign paged content and number of pages.
+     */
+    function usePager(products) {
+        return {
+            products: products.slice(page * itemsPerPage, page * itemsPerPage + itemsPerPage),
+            pageCount: Math.ceil(products.length / itemsPerPage)
+        }
+    }
+
+    /**
+     * Generate the markup for the pagers.
+     *
+     * @param {object} pager
+     *
+     * @return {string} The markup for the pager.
+     */
+    function renderPager(pager) {
+        let markup = page > 0 ? "<button onclick='updateProducts(page-1)'>&laquo;</button>" : "<button class='disabled'>&laquo;</button>";
+        for (let i = 0; i < pager.pageCount; i++) {
+            markup += `<button onclick='updateProducts(${i})' ${i === page && "class='active'"}>${i + 1}</button>`;
+        }
+        markup += page < (pager.pageCount - 1) ? "<button onclick='updateProducts(page+1)'>&raquo;</button>" : "<button class='disabled'>&raquo;</button>";
+
+        return markup;
+    }
+
+    /**
+     * Get a list of all products from the endpoint.
+     *
+     * @param {string} url
+     *
+     * @return {array} Array of all products from the endpoint.
+     */
+    async function getProducts(url = '') {
+        if (products.length > 0) {
+            return products;
+        }
+
+        try {
+            let response = await fetch(url);
+            let json = await response.json();
+            let products = json.map(product => {
+                return {
+                    product: product.product,
+                    cat: capitalizeWords(product.cat),
+                    price: formatMoney(product.price),
+                    sale: formatMoney(product.sale)
+                }
+            });
+            return products;
+        } catch (err) {
+            throw(err);
+        }
+    }
+
+    /**
+     * Update the products displayed based on pager selections.
+     *
+     * @param {number} pageClicked
+     */
+    function updateProducts(pageClicked = 0) {
+        page = pageClicked
+        // call getProducts using the asynchronous try..catch method.
+        products = getProducts('https://neodigm.github.io/FED_Programming_Challenge/products.json')
+            .then(products => {
+                const pager = usePager(products)
+                const productsMarkup = pager.products.map(product => {
+                    return `
+                    <a class="product--link" href="#">
+                        <article class="product">
+                            <div class="product--image">
+                                <img src="img.png">
+                            </div>
+                            <div class="product--details">
+                                <h2 class="product--details--title">${product.product}</h2>
+                                <p class="product--category">${product.cat}</p>
+                                <p class="product--price">
+                                    <span class="product--old-price">${product.price}</span>
+                                    ${product.sale}
+                                </p>
+                            </div>
+                        </article>
+                    </a>
+                `;
+                }).join('');
+                const pagerMarkup = renderPager(pager);
+                document.getElementById('products').innerHTML = productsMarkup;
+                const pagerElements = document.getElementsByClassName('pagination');
+
+                for (let i = 0; i < pagerElements.length; i++) {
+                    pagerElements[i].innerHTML = pagerMarkup;
+                }
+
+                window.scrollTo({top: 0, behavior: 'smooth'});
+
+            }).catch(err => {
+                console.log(err);
+            });
+    }
+
+    // Call update products on page load.
+    updateProducts(0);
+</script>
+</html>
